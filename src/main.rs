@@ -2,58 +2,99 @@ use std::env;
 use std::process;
 use std::fs;
 use std::io;
+use std::fmt;
 use scanlex::{Scanner, Token};
 //use std::io::{self, BufRead, BufReader};
 
 // walk-tree-interpreter in rust from java code in the book craftinginterpreters
 
 fn main() {
-    enum Ast_tree {
-        Binary_expr(Ast_binary),
-        Decl(Ast_decl)
-        //Statements
-        //Expressions
-        //Literals
-        //Identifiers/Names
-    }
-    
-    //struct Ast_tree
-
-    //struct Ast1_module {
-     //module: String,
-     //in_scope: bool,
-     //string_of_bytes_to_run: String
-     //code later 
-     //this will run other modules (files) to use fn's or other things later
-    //}
-
-    struct Ast_decl {
-        is_var: bool,
-        is_module: bool
-        //code later for fun's 
+    enum Expr{
+     Atom(i64),
+     Oper(char,Vec<Expr>)
     }
 
-    struct Ast_binary {
-        left: String,
-        op: char,
-        right: i32
-    }
-
-    impl Ast_decl {
-       fn iden_find(token: &Token) -> Ast_decl{
-         if token == &Token::Iden("module".to_string()){
-         return Ast_decl{
-           is_module: true,
-           is_var: false
-          }
-         }
-         //else if code later
-        return Ast_decl{
-         is_module: false,
-         is_var: false
+    impl Expr{
+        fn eval(&self) -> f32{
+            match self{
+                Expr::Atom(c) => {
+                 match c {
+                     i64::MIN..=i64::MAX => {
+                        let c_f32: f32 = c.clone() as f32;
+                        return c_f32;
+                     },
+                     _ => todo!(),
+                 }
+                },
+                Expr::Oper(op, opands) => {
+                let lhs = opands.first().unwrap().eval();
+                let rhs = opands.last().unwrap().eval();
+                match op {
+                    '+' => return lhs + rhs,
+                    '-' => return lhs - rhs,
+                    '*' => return lhs * rhs,
+                    '/' => return lhs / rhs,
+                    _ => todo!(),
+                    
+                }
+                },
+                _ => todo!(),
+            }
         }
-       }
     }
+
+    impl fmt::Display for Expr {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Expr::Atom(i) => write!(f, "{}", i),
+            Expr::Oper(head, rest) => {
+                write!(f, "({}", head)?;
+                for s in rest {
+                    write!(f, " {}", s)?
+                }
+                write!(f, ")")
+            }
+        }
+    }
+}
+
+    fn infix_binding_power(op: char) ->(f32, f32){
+        match op{
+            '+' | '-' => (1.0, 1.1),
+            '*' | '/' => (2.0, 2.1),
+            _ => panic!("unknown operator: {:?}", op)
+            // more op's later like ()'s but this lexer is a litte more better then what this is for
+        }
+    }
+
+fn parse_expr(scan: &mut Scanner, min_bp: f32) -> Expr{
+   let mut lhs = match scan.get() {
+          Token::Int(it) => Expr::Atom(it),
+           Token::End => panic!("hit the end of source"),
+           _ => todo!(),
+           // this should be where the ()'s go recursively with 0.0 for binding power
+    };
+    //need to fix op to = to scan.peek() but it return's char's
+    //so I have to use scan.get() because I can't find a way to use peek right
+   loop {
+    //you need a space so this runs right 
+    let op = match scan.get() {
+          Token::End => return lhs,
+          Token::Char(op) => op,
+          _ => todo!(),
+     };
+     //I need to put this back
+    //scan.get();
+    let (l_bp, r_bp) = infix_binding_power(op);
+    if l_bp < min_bp{
+        break;
+    }
+    let rhs = parse_expr(scan, r_bp); 
+    lhs = Expr::Oper(op, vec![lhs, rhs]);
+    }
+   lhs
+}
+    // code here later
 
     fn run_files(path: &str) {
      let bytes: Vec<u8> = fs::read(path).expect("could not read file or there is no {path}");
@@ -61,8 +102,6 @@ fn main() {
      let bytes_to_string = String::from_utf8(bytes);
 
      run(&bytes_to_string.expect("IDK"));
-     // debug
-     println!("run_files worked");
     }
 
     fn run_prompt(){
@@ -82,35 +121,34 @@ fn main() {
     }
 
     fn run(source: &str) {
-     let mut tokens: Vec<Token> = Vec::new();
+     //let mut tokens: Vec<Token> = Vec::new();
      let mut scan = Scanner::new(source);
-     while let s = scan.get() {
+     /*while let s = scan.get() {
          if s == Token::End {
           break
          }
          tokens.push(s);
-     }
+     }*/
      //debug
-     println!("{:?}", tokens);
-     //code later
-     for i in 0..tokens.len() {
+     //println!("{:?}", tokens);
+     let output = parse_expr(&mut scan, 0.0).eval();
+     println!("{}", output);
+     //code later 
+     /*for i in 0..tokens.len() {
         let n = &tokens[i];  
         match n {
-          Token::Iden(_) => {
-              //if tokens[i] == Token::Iden("module".to_string()){
-              //debug
-               println!("Iden found");
-               let find = Ast_decl::iden_find(n);
-               //Ast_tree::Decl(find);
-               let found: bool = find.is_module;
-               println!("{}", find.is_module);
-              //code later
-          },
-          _ => todo!()
+          Token::Num(_) => {println!("Num found"); /*code later*/},
+          Token::Int(_) => {println!("Int found"); /*code later*/},
+          Token::Str(_) => {println!("Str found"); /*code later*/},
+          Token::Iden(_) => {println!("Iden found"); /*code later*/},
+          Token::Char(_) => {println!("Char found"); /*code later*/},
+          Token::Error(_) => {todo!(); /*code later*/},
+          Token::End => {println!("EOF"); /*code later*/}
           //code later
         }
      }
      //for loop with enum and struct's
+     */
     }
 
     let args: Vec<String> = env::args().collect();
